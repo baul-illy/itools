@@ -1,4 +1,4 @@
 # itools
 
 ## Better Growth Charts
-![BGC](images/better-growth-charts.gif)
+![](better-growth-charts.gif)
