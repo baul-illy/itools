@@ -163,21 +163,17 @@
           scales: {
             x: {
               // bounds: 'ticks',
-              grid: { color: 'rgba(0, 0, 0, 0.05)' },
               ticks: {
-                color: '#64748b',
                 maxTicksLimit: 8,
                 maxRotation: 0,
-                callback: function(val, index) {
+                callback: function(val) {
                   const ts = this.getLabelForValue(val);
                   return formatTimestamp(Number(ts));
                 }
               },
             },
             y: {
-              grid: { color: 'rgba(0, 0, 0, 0.05)' },
               ticks: {
-                color: '#64748b',
                 callback: (v) => v.toLocaleString()
               }
             }
@@ -189,11 +185,11 @@
               labels: { color: '#334155', font: { size: 12, weight: '600' } }
             },
             tooltip: {
-              backgroundColor: '#ffffff',
-              titleColor: '#0f172a',
+              backgroundColor: '#f2ebcc',
+              titleColor: '#000000',
               bodyColor: cfg.color,
-              borderColor: '#e2e8f0',
-              borderWidth: 1,
+              borderColor: '#000000',
+              borderWidth: 0,
               padding: 8,
               displayColors: false,
               callbacks: {
@@ -201,24 +197,17 @@
                   if (!items.length) return '';
                   return formatTimestamp(Number(items[0].label));
                 },
-                // label: (ctx) => ` ${cfg.label}: ${ctx.parsed.y.toLocaleString()}`
+                // label: (ctx) => ` ${cfg.label}: ${ctx.parsed.y.toLocaleString()}` // why doesn't this work?
                 label: (ctx) => ` Value: ${ctx.parsed.y.toLocaleString()}`
               }
             },
             zoom: {
               zoom: {
-                wheel: {
-                  enabled: true, // Enable zooming with mouse wheel
-                },
-                pinch: {
-                  enabled: true // Enable zooming with pinch gestures (touch screens)
-                },
+                wheel: {enabled: true},
+                pinch: {enabled: true},
                 mode: 'x', // Zoom direction: 'x', 'y', or 'xy'
               },
-              pan: {
-                enabled: true,
-                mode: 'x', // Pan direction
-              }
+              pan: {enabled: true, mode: 'x'}
             }
           }
         }
@@ -271,12 +260,12 @@
         padding: 14px;
         box-sizing: border-box;
         background: #fefae8;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        border: 1px solid #c4c1c1;
+        border-radius: 0px;
         color: #0f172a;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       `;
+        // box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
       const toolbar = document.createElement('div');
       toolbar.style.cssText = 'display: flex; align-items: center; margin-bottom: 12px; justify-content: space-between;';
