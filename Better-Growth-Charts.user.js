@@ -10,6 +10,8 @@
 // @require      https://cdn.jsdelivr.net/npm/chart.js
 // @require      https://cdn.jsdelivr.net/npm/hammerjs/hammer.min.js
 // @require      https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js
+// @updateURL    https://github.com/baul-illy/itools/raw/refs/heads/main/Better-Growth-Charts.user.js
+// @downloadURL  https://github.com/baul-illy/itools/raw/refs/heads/main/Better-Growth-Charts.user.js
 // ==/UserScript==
 
 (function() {
