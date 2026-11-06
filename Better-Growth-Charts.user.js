@@ -49,7 +49,7 @@
     Build: null
   };
 
-  let selectedMetric = 'Pop';
+  let selectedMetric = 'Members';
   let chartInstance = null;
 
   /**
@@ -75,10 +75,10 @@
       capturedData[key] = null;
     }
 
-    if (document.URL) {
-      selectedMetric = 'Pop';
-    } else {
+    if (document.URL.includes('Alliance')) {
       selectedMetric = 'Members';
+    } else {
+      selectedMetric = 'Pop';
     }
   }
 
@@ -107,6 +107,9 @@
       chartInstance = null;
     }
 
+    if (selectedMetric === 'Members' && ! document.URL.includes("Alliance")) {
+      selectedMetric = 'Pop';
+    }
     const rawData = capturedData[selectedMetric];
     const cfg = Object.values(METRIC_CONFIG).find(c => c.key === selectedMetric);
 
@@ -264,23 +267,22 @@
       `;
 
       const toolbar = document.createElement('div');
-      toolbar.style.cssText = 'display: flex; align-items: center; margin-bottom: 12px;';
-      // toolbar.style.display = 'flex'
+      toolbar.style.cssText = 'display: flex; align-items: center; margin-bottom: 12px; justify-content: space-between;';
 
       // select
       const select = document.createElement('select');
       select.id = 'metricDropdownSelect';
-      select.style.cssText = `
-        background: #f8fafc;
-        color: #0f172a;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 5px 12px;
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-        outline: none;
-      `;
+      // select.style.cssText = `
+      //   background: #f8fafc;
+      //   color: #0f172a;
+      //   border: 1px solid #cbd5e1;
+      //   border-radius: 6px;
+      //   padding: 5px 12px;
+      //   font-size: 13px;
+      //   font-weight: 500;
+      //   cursor: pointer;
+      //   outline: none;
+      // `;
 
       const options = [
         ['Population', 'Pop'],
@@ -317,11 +319,8 @@
       // Reset Zoom
       const resetZoomButton = document.createElement('button');
       resetZoomButton.id = 'resetZoomButton';
-      // resetZoomButton.style.position = 'absolute';
-      // resetZoomButton.style.right = '0px';
-      // resetZoomButton.style.left = '150px';
-      resetZoomButton.style.marginLeft = 'auto';
       resetZoomButton.innerText = 'Reset Zoom';
+      // resetZoomButton.style.marginLeft = 'auto';
       resetZoomButton.addEventListener('click', () => {
         if (chartInstance) {
           chartInstance.resetZoom();
