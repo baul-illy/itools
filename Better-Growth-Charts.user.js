@@ -52,12 +52,9 @@
   };
 
   let selectedMetric = 'Members';
+  let selectedRightMetric = 'None';
   let chartInstance = null;
 
-  /**
-   * Completely destroys active chart instance, removes injected UI,
-   * and clears captured data to prevent memory leaks and zombie canvases.
-   */
   function cleanup() {
     if (chartInstance) {
       try {
@@ -82,6 +79,7 @@
     } else {
       selectedMetric = 'Pop';
     }
+    selectedRightMetric = 'None';
   }
 
   win.addEventListener('hashchange', cleanup);
@@ -91,7 +89,6 @@
     if (typeof ts === 'number') {
       const date = new Date(ts > 1e11 ? ts : ts * 1000);
       if (!isNaN(date.getTime())) {
-        // return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         return date.toLocaleDateString([], {month: 'numeric', day: 'numeric'}) + ' ' + date.toLocaleTimeString([], { hour: '2-digit',  minute: '2-digit', hour12: false });
       }
     }
@@ -109,29 +106,90 @@
       chartInstance = null;
     }
 
-    if (selectedMetric === 'Members' && ! document.URL.includes("Alliance")) {
+    if (selectedMetric === 'Members' && !document.URL.includes("Alliance")) {
       selectedMetric = 'Pop';
     }
+    if (selectedRightMetric === 'Members' && !document.URL.includes("Alliance")) {
+      selectedRightMetric = 'None';
+    }
+
     const rawData = capturedData[selectedMetric];
     const cfg = Object.values(METRIC_CONFIG).find(c => c.key === selectedMetric);
+
+    const hasRight = selectedRightMetric && selectedRightMetric !== 'None';
+    const cfgRight = hasRight ? Object.values(METRIC_CONFIG).find(c => c.key === selectedRightMetric) : null;
+    const rawDataRight = hasRight ? capturedData[selectedRightMetric] : null;
+    const hasRightData = Boolean(hasRight && cfgRight && rawDataRight && rawDataRight.length);
 
     if (!rawData || !rawData.length) {
       if (chartInstance) {
         chartInstance.data.labels = ['No data captured yet'];
-        chartInstance.data.datasets[0].data = [0];
-        chartInstance.data.datasets[0].label = `${cfg.label} (Awaiting Data...)`;
+        chartInstance.data.datasets = [{
+          label: `${cfg.label} (Awaiting Data...)`,
+          data: [0]
+        }];
+        if (chartInstance.options.scales.y1) {
+          chartInstance.options.scales.y1.display = false;
+        }
         chartInstance.update('none');
       }
       return;
     }
 
-    const sortedData = [...rawData].sort((a, b) => a[0] - b[0]);
-    const rawTimestamps = new Array(sortedData.length);
-    const values = new Array(sortedData.length);
+    const sortedLeftData = [...rawData].sort((a, b) => a[0] - b[0]);
+    let rawTimestamps;
+    let leftValues;
+    let rightValues = null;
 
-    for (let i = 0; i < sortedData.length; i++) {
-      rawTimestamps[i] = sortedData[i][0];
-      values[i] = sortedData[i][1];
+    if (hasRightData) {
+      const sortedRightData = [...rawDataRight].sort((a, b) => a[0] - b[0]);
+      const leftMap = new Map(sortedLeftData);
+      const rightMap = new Map(sortedRightData);
+      const tsSet = new Set();
+      for (let i = 0; i < sortedLeftData.length; i++) tsSet.add(sortedLeftData[i][0]);
+      for (let i = 0; i < sortedRightData.length; i++) tsSet.add(sortedRightData[i][0]);
+      rawTimestamps = Array.from(tsSet).sort((a, b) => a - b);
+      leftValues = rawTimestamps.map(ts => leftMap.has(ts) ? leftMap.get(ts) : null);
+      rightValues = rawTimestamps.map(ts => rightMap.has(ts) ? rightMap.get(ts) : null);
+    } else {
+      rawTimestamps = new Array(sortedLeftData.length);
+      leftValues = new Array(sortedLeftData.length);
+      for (let i = 0; i < sortedLeftData.length; i++) {
+        rawTimestamps[i] = sortedLeftData[i][0];
+        leftValues[i] = sortedLeftData[i][1];
+      }
+    }
+
+    const datasets = [{
+      label: cfg.label,
+      data: leftValues,
+      borderColor: cfg.color,
+      backgroundColor: cfg.bg,
+      fill: true,
+      tension: 0,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      borderWidth: 1.5,
+      normalized: true,
+      spanGaps: true,
+      yAxisID: 'y'
+    }];
+
+    if (hasRightData) {
+      datasets.push({
+        label: cfgRight.label,
+        data: rightValues,
+        borderColor: cfgRight.color,
+        backgroundColor: cfgRight.bg,
+        fill: false,
+        tension: 0,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        borderWidth: 1.5,
+        normalized: true,
+        spanGaps: true,
+        yAxisID: 'y1'
+      });
     }
 
     if (!chartInstance) {
@@ -139,18 +197,7 @@
         type: 'line',
         data: {
           labels: rawTimestamps,
-          datasets: [{
-            label: cfg.label,
-            data: values,
-            borderColor: cfg.color,
-            backgroundColor: cfg.bg,
-            fill: true,
-            tension: 0,             // why the fuck does chart.js default to Bezier curves
-            pointRadius: 0,         // Zero base circles drawn
-            pointHoverRadius: 5,    // Circle only draws when hovered
-            borderWidth: 1.5,
-            normalized: true        
-          }]
+          datasets: datasets
         },
         options: {
           responsive: true,
@@ -162,7 +209,6 @@
           },
           scales: {
             x: {
-              // bounds: 'ticks',
               ticks: {
                 maxTicksLimit: 8,
                 maxRotation: 0,
@@ -173,6 +219,17 @@
               },
             },
             y: {
+              position: 'left',
+              ticks: {
+                callback: (v) => v.toLocaleString()
+              }
+            },
+            y1: {
+              position: 'right',
+              display: hasRightData,
+              grid: {
+                drawOnChartArea: false
+              },
               ticks: {
                 callback: (v) => v.toLocaleString()
               }
@@ -181,7 +238,7 @@
           plugins: {
             responsive: true,
             legend: {
-              display: false, // temporary until multiplotting - hides the legend
+              display: false,
               labels: { color: '#334155', font: { size: 12, weight: '600' } }
             },
             tooltip: {
@@ -197,15 +254,14 @@
                   if (!items.length) return '';
                   return formatTimestamp(Number(items[0].label));
                 },
-                // label: (ctx) => ` ${cfg.label}: ${ctx.parsed.y.toLocaleString()}` // why doesn't this work?
-                label: (ctx) => ` Value: ${ctx.parsed.y.toLocaleString()}`
+                label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y !== null && ctx.parsed.y !== undefined ? ctx.parsed.y.toLocaleString() : ''}`
               }
             },
             zoom: {
               zoom: {
                 wheel: {enabled: true},
                 pinch: {enabled: true},
-                mode: 'x', // Zoom direction: 'x', 'y', or 'xy'
+                mode: 'x',
               },
               pan: {enabled: true, mode: 'x'}
             }
@@ -214,12 +270,10 @@
       });
     } else {
       chartInstance.data.labels = rawTimestamps;
-      chartInstance.data.datasets[0].label = cfg.label;
-      chartInstance.data.datasets[0].data = values;
-      chartInstance.data.datasets[0].borderColor = cfg.color;
-      chartInstance.data.datasets[0].backgroundColor = cfg.bg;
+      chartInstance.data.datasets = datasets;
+      chartInstance.options.scales.y1.display = hasRightData;
       chartInstance.options.plugins.tooltip.bodyColor = cfg.color;
-      chartInstance.update('none'); // 'none' skips update animation
+      chartInstance.update('none');
     }
   }
 
@@ -265,7 +319,6 @@
         color: #0f172a;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       `;
-        // box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
       const toolbar = document.createElement('div');
       toolbar.style.cssText = 'display: flex; align-items: center; margin-bottom: 12px; justify-content: space-between;';
@@ -299,10 +352,34 @@
       select.addEventListener('change', (e) => {
         selectedMetric = e.target.value;
         scheduleChartUpdate();
-        chartInstance.resetZoom();
+        if (chartInstance) {
+          chartInstance.resetZoom();
+        }
       });
 
-      toolbar.appendChild(select);
+      const rightSelect = document.createElement('select');
+      rightSelect.id = 'rightMetricDropdownSelect';
+
+      rightSelect.add(new Option('None', 'None'));
+      for (const [text, val] of options) {
+        rightSelect.add(new Option(text, val));
+      }
+
+      rightSelect.value = selectedRightMetric;
+      rightSelect.addEventListener('change', (e) => {
+        selectedRightMetric = e.target.value;
+        scheduleChartUpdate();
+        if (chartInstance) {
+          chartInstance.resetZoom();
+        }
+      });
+
+      const selectContainer = document.createElement('div');
+      selectContainer.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+      selectContainer.appendChild(select);
+      selectContainer.appendChild(rightSelect);
+
+      toolbar.appendChild(selectContainer);
 
       const resetZoomButton = document.createElement('button');
       resetZoomButton.id = 'resetZoomButton';
@@ -325,8 +402,7 @@
       panel.appendChild(chartWrapper);
 
       nativeContainer.parentNode.insertBefore(panel, nativeContainer);
-      
-      // Defer initial paint so Flotr layout finishes undisturbed
+
       scheduleChartUpdate();
     }
   }
@@ -336,7 +412,6 @@
 
     const originalDraw = flotr.draw;
     flotr.draw = function(container, data) {
-      // Let Flotr complete its native draw immediately
       const result = originalDraw.apply(this, arguments);
 
       try {
@@ -346,21 +421,14 @@
 
         const id = target?.id || target?.getAttribute?.('id');
 
-        // Only mount once target is present
         if (id === 'membersGraph' || (id === 'popGraph' && !document.URL.includes("Alliance"))) {
           mountDashboard(target);
         }
 
-        // Capture data as it's filled
         if (METRIC_CONFIG[id]) {
           const metricKey = METRIC_CONFIG[id].key;
           if (data && data[0] && Array.isArray(data[0].data)) {
             capturedData[metricKey] = data[0].data;
-
-            // // ONLY trigger an update if the active metric changed
-            // if (metricKey === selectedMetric) {
-            //   scheduleChartUpdate();
-            // }
           }
         }
       } catch (err) {
