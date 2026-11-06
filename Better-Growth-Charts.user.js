@@ -310,6 +310,7 @@
       select.addEventListener('change', (e) => {
         selectedMetric = e.target.value;
         scheduleChartUpdate();
+        chartInstance.resetZoom();
       });
 
       toolbar.appendChild(select);
