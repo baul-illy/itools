@@ -8,6 +8,8 @@
 // @grant        unsafeWindow
 // @run-at       document-start
 // @require      https://cdn.jsdelivr.net/npm/chart.js
+// @require      https://cdn.jsdelivr.net/npm/hammerjs/hammer.min.js
+// @require      https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js
 // ==/UserScript==
 
 (function() {
@@ -15,10 +17,13 @@
 
   const win = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
+  window.Chart.register(window.ChartZoom);
+
   const METRIC_CONFIG = {
+    membersGraph: { key: 'Members', label: 'Members', color: '#1d5b05', bg: 'rgba(29, 91, 5, 0.08)' },
     popGraph: { key: 'Pop', label: 'Population', color: '#1d5b05', bg: 'rgba(29, 91, 5, 0.08)' },
     townsGraph: { key: 'Towns', label: 'Towns', color: '#c7b302', bg: 'rgba(199, 179, 2, 0.08)' },
-    sovGraph: { key: 'Sov', label: 'Sovereignty', color: '#a5c40b', bg: 'rgba(165, 196, 11, 0.08)' },
+    sovGraph: { key: 'Land', label: 'Land', color: '#a5c40b', bg: 'rgba(165, 196, 11, 0.08)' },
     tradeScoreGraph: { key: 'Trade', label: 'Trade Score', color: '#8611c9', bg: 'rgba(134, 17, 201, 0.08)' },
     techScoreGraph: { key: 'Tech', label: 'Technology Score', color: '#024902', bg: 'rgba(2, 73, 2, 0.08)' },
     diploScoreGraph: { key: 'Diplo', label: 'Diplomatic Score', color: '#db2215', bg: 'rgba(219, 34, 21, 0.08)' },
@@ -30,6 +35,7 @@
   };
 
   const capturedData = {
+    Members: null,
     Pop: null,
     Towns: null,
     Sov: null,
@@ -69,7 +75,11 @@
       capturedData[key] = null;
     }
 
-    selectedMetric = 'Pop';
+    if (document.URL) {
+      selectedMetric = 'Pop';
+    } else {
+      selectedMetric = 'Members';
+    }
   }
 
   win.addEventListener('hashchange', cleanup);
@@ -79,7 +89,8 @@
     if (typeof ts === 'number') {
       const date = new Date(ts > 1e11 ? ts : ts * 1000);
       if (!isNaN(date.getTime())) {
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        // return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleDateString([], {month: 'numeric', day: 'numeric'}) + ' ' + date.toLocaleTimeString([], { hour: '2-digit',  minute: '2-digit', hour12: false });
       }
     }
     return String(ts);
@@ -146,6 +157,7 @@
           },
           scales: {
             x: {
+              // bounds: 'ticks',
               grid: { color: 'rgba(0, 0, 0, 0.05)' },
               ticks: {
                 color: '#64748b',
@@ -155,7 +167,7 @@
                   const ts = this.getLabelForValue(val);
                   return formatTimestamp(Number(ts));
                 }
-              }
+              },
             },
             y: {
               grid: { color: 'rgba(0, 0, 0, 0.05)' },
@@ -166,7 +178,9 @@
             }
           },
           plugins: {
+            responsive: true,
             legend: {
+              display: false, // temporary until multiplotting - hides the legend
               labels: { color: '#334155', font: { size: 12, weight: '600' } }
             },
             tooltip: {
@@ -182,7 +196,23 @@
                   if (!items.length) return '';
                   return formatTimestamp(Number(items[0].label));
                 },
-                label: (ctx) => ` ${cfg.label}: ${ctx.parsed.y.toLocaleString()}`
+                // label: (ctx) => ` ${cfg.label}: ${ctx.parsed.y.toLocaleString()}`
+                label: (ctx) => ` Value: ${ctx.parsed.y.toLocaleString()}`
+              }
+            },
+            zoom: {
+              zoom: {
+                wheel: {
+                  enabled: true, // Enable zooming with mouse wheel
+                },
+                pinch: {
+                  enabled: true // Enable zooming with pinch gestures (touch screens)
+                },
+                mode: 'x', // Zoom direction: 'x', 'y', or 'xy'
+              },
+              pan: {
+                enabled: true,
+                mode: 'x', // Pan direction
               }
             }
           }
@@ -199,7 +229,7 @@
     }
   }
 
-  function ensureDashboardMounted(nativeContainer) {
+  function mountDashboard(nativeContainer) {
     if (!nativeContainer || !nativeContainer.parentNode) return;
 
     let panel = document.getElementById('custom-interactive-panel');
@@ -225,7 +255,7 @@
         margin-bottom: 16px;
         padding: 14px;
         box-sizing: border-box;
-        background: #ffffff;
+        background: #fefae8;
         border: 1px solid #e2e8f0;
         border-radius: 8px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -235,7 +265,9 @@
 
       const toolbar = document.createElement('div');
       toolbar.style.cssText = 'display: flex; align-items: center; margin-bottom: 12px;';
+      // toolbar.style.display = 'flex'
 
+      // select
       const select = document.createElement('select');
       select.id = 'metricDropdownSelect';
       select.style.cssText = `
@@ -253,7 +285,7 @@
       const options = [
         ['Population', 'Pop'],
         ['Towns', 'Towns'],
-        ['Land', 'Sov'],
+        ['Land', 'Land'],
         ['Trade', 'Trade'],
         ['Tech', 'Tech'],
         ['Diplomacy', 'Diplo'],
@@ -263,6 +295,12 @@
         ['Magic', 'Magic'],
         ['Build', 'Build']
       ];
+
+      // if (document.querySelector('#membersGraph') !== null) {
+      if (document.URL.includes("Alliance")) {
+        // const options = [['Members','Members'], ...options];
+        options.unshift(['Members','Members'])
+      }
 
       for (const [text, val] of options) {
         select.add(new Option(text, val));
@@ -276,6 +314,22 @@
 
       toolbar.appendChild(select);
 
+      // Reset Zoom
+      const resetZoomButton = document.createElement('button');
+      resetZoomButton.id = 'resetZoomButton';
+      // resetZoomButton.style.position = 'absolute';
+      // resetZoomButton.style.right = '0px';
+      // resetZoomButton.style.left = '150px';
+      resetZoomButton.style.marginLeft = 'auto';
+      resetZoomButton.innerText = 'Reset Zoom';
+      resetZoomButton.addEventListener('click', () => {
+        if (chartInstance) {
+          chartInstance.resetZoom();
+        }
+      });
+      toolbar.append(resetZoomButton)
+
+      // Chart
       const chartWrapper = document.createElement('div');
       chartWrapper.style.cssText = 'position: relative; height: 320px; width: 100%;';
 
@@ -296,7 +350,7 @@
     if (!flotr || flotr.__interactiveSuiteInstalled) return;
 
     const originalDraw = flotr.draw;
-    flotr.draw = function(container, data, options) {
+    flotr.draw = function(container, data) {
       try {
         const target = typeof container === 'string'
           ? document.getElementById(container)
@@ -312,8 +366,8 @@
           }
         }
 
-        if (id === 'popGraph') {
-          ensureDashboardMounted(target);
+        if (id === 'membersGraph' || (id === 'popGraph' && !document.URL.includes("Alliance"))) {
+          mountDashboard(target);
         }
       } catch (err) {
         console.error('[Interactive Suite] Error in Flotr hook:', err);
