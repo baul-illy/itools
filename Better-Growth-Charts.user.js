@@ -2,7 +2,7 @@
 // @name         Better Growth Charts
 // @author       baul
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Interactive growth chart for Illyriad
 // @match        *://elgea.illyriad.co.uk/*
 // @grant        unsafeWindow
@@ -234,12 +234,22 @@
     }
   }
 
+  let chartUpdatePending = false;
+
+  function scheduleChartUpdate() {
+    if (chartUpdatePending) return;
+    chartUpdatePending = true;
+    requestAnimationFrame(() => {
+      chartUpdatePending = false;
+      updateChart();
+    });
+  }
+
   function mountDashboard(nativeContainer) {
     if (!nativeContainer || !nativeContainer.parentNode) return;
 
     let panel = document.getElementById('custom-interactive-panel');
 
-    // If a stale panel exists but is detached or misplaced relative to the new popGraph, wipe it
     if (panel && (!panel.isConnected || panel.nextElementSibling !== nativeContainer)) {
       panel.remove();
       panel = null;
@@ -271,20 +281,8 @@
       const toolbar = document.createElement('div');
       toolbar.style.cssText = 'display: flex; align-items: center; margin-bottom: 12px; justify-content: space-between;';
 
-      // select
       const select = document.createElement('select');
       select.id = 'metricDropdownSelect';
-      // select.style.cssText = `
-      //   background: #f8fafc;
-      //   color: #0f172a;
-      //   border: 1px solid #cbd5e1;
-      //   border-radius: 6px;
-      //   padding: 5px 12px;
-      //   font-size: 13px;
-      //   font-weight: 500;
-      //   cursor: pointer;
-      //   outline: none;
-      // `;
 
       const options = [
         ['Population', 'Pop'],
@@ -300,10 +298,8 @@
         ['Build', 'Build']
       ];
 
-      // if (document.querySelector('#membersGraph') !== null) {
       if (document.URL.includes("Alliance")) {
-        // const options = [['Members','Members'], ...options];
-        options.unshift(['Members','Members'])
+        options.unshift(['Members', 'Members']);
       }
 
       for (const [text, val] of options) {
@@ -313,24 +309,21 @@
       select.value = selectedMetric;
       select.addEventListener('change', (e) => {
         selectedMetric = e.target.value;
-        updateChart();
+        scheduleChartUpdate();
       });
 
       toolbar.appendChild(select);
 
-      // Reset Zoom
       const resetZoomButton = document.createElement('button');
       resetZoomButton.id = 'resetZoomButton';
       resetZoomButton.innerText = 'Reset Zoom';
-      // resetZoomButton.style.marginLeft = 'auto';
       resetZoomButton.addEventListener('click', () => {
         if (chartInstance) {
           chartInstance.resetZoom();
         }
       });
-      toolbar.append(resetZoomButton)
+      toolbar.append(resetZoomButton);
 
-      // Chart
       const chartWrapper = document.createElement('div');
       chartWrapper.style.cssText = 'position: relative; height: 320px; width: 100%;';
 
@@ -342,9 +335,10 @@
       panel.appendChild(chartWrapper);
 
       nativeContainer.parentNode.insertBefore(panel, nativeContainer);
+      
+      // Defer initial paint so Flotr layout finishes undisturbed
+      scheduleChartUpdate();
     }
-
-    updateChart();
   }
 
   function hookFlotr(flotr) {
@@ -352,6 +346,9 @@
 
     const originalDraw = flotr.draw;
     flotr.draw = function(container, data) {
+      // Let Flotr complete its native draw immediately
+      const result = originalDraw.apply(this, arguments);
+
       try {
         const target = typeof container === 'string'
           ? document.getElementById(container)
@@ -359,22 +356,28 @@
 
         const id = target?.id || target?.getAttribute?.('id');
 
+        // Only mount once target is present
+        if (id === 'membersGraph' || (id === 'popGraph' && !document.URL.includes("Alliance"))) {
+          mountDashboard(target);
+        }
+
+        // Capture data as it's filled
         if (METRIC_CONFIG[id]) {
           const metricKey = METRIC_CONFIG[id].key;
           if (data && data[0] && Array.isArray(data[0].data)) {
             capturedData[metricKey] = data[0].data;
-            updateChart();
-          }
-        }
 
-        if (id === 'membersGraph' || (id === 'popGraph' && !document.URL.includes("Alliance"))) {
-          mountDashboard(target);
+            // // ONLY trigger an update if the active metric changed
+            // if (metricKey === selectedMetric) {
+            //   scheduleChartUpdate();
+            // }
+          }
         }
       } catch (err) {
         console.error('[Interactive Suite] Error in Flotr hook:', err);
       }
 
-      return originalDraw.apply(this, arguments);
+      return result;
     };
 
     flotr.__interactiveSuiteInstalled = true;
