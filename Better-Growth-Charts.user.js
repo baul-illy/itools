@@ -2,7 +2,7 @@
 // @name         Better Growth Charts
 // @author       baul
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.2.1
 // @description  Interactive growth chart for Illyriad
 // @match        *://elgea.illyriad.co.uk/*
 // @grant        unsafeWindow
