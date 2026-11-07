@@ -6,7 +6,7 @@
 // @description  Fixes long names such as Poisonous Crawler Exoskeleton
 // @match        *://elgea.illyriad.co.uk/*
 // @grant        none
-// @run-at       document-start
+// @run-at       document-idle
 // @updateURL    https://github.com/baul-illy/itools/raw/refs/heads/main/fix-long-names.user.js
 // @downloadURL  https://github.com/baul-illy/itools/raw/refs/heads/main/fix-long-names.user.js
 // ==/UserScript==
