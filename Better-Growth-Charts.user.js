@@ -136,27 +136,17 @@
       return;
     }
 
-    const sortedLeftData = [...rawData].sort((a, b) => a[0] - b[0]);
     let rawTimestamps;
     let leftValues;
     let rightValues = null;
-
-    if (hasRightData) {
-      const sortedRightData = [...rawDataRight].sort((a, b) => a[0] - b[0]);
-      const leftMap = new Map(sortedLeftData);
-      const rightMap = new Map(sortedRightData);
-      const tsSet = new Set();
-      for (let i = 0; i < sortedLeftData.length; i++) tsSet.add(sortedLeftData[i][0]);
-      for (let i = 0; i < sortedRightData.length; i++) tsSet.add(sortedRightData[i][0]);
-      rawTimestamps = Array.from(tsSet).sort((a, b) => a - b);
-      leftValues = rawTimestamps.map(ts => leftMap.has(ts) ? leftMap.get(ts) : null);
-      rightValues = rawTimestamps.map(ts => rightMap.has(ts) ? rightMap.get(ts) : null);
-    } else {
-      rawTimestamps = new Array(sortedLeftData.length);
-      leftValues = new Array(sortedLeftData.length);
-      for (let i = 0; i < sortedLeftData.length; i++) {
-        rawTimestamps[i] = sortedLeftData[i][0];
-        leftValues[i] = sortedLeftData[i][1];
+    rawTimestamps = new Array(rawData.length);
+    leftValues = new Array(rawData.length);
+    rightValues = new Array(rawData.length);
+    for (let i = 0; i < rawData.length; i++) {
+      rawTimestamps[i] = rawData[i][0];
+      leftValues[i] = rawData[i][1];
+      if (hasRightData) {
+        rightValues[i] = rawDataRight[i][1];
       }
     }
 
@@ -369,9 +359,9 @@
       rightSelect.addEventListener('change', (e) => {
         selectedRightMetric = e.target.value;
         scheduleChartUpdate();
-        if (chartInstance) {
-          chartInstance.resetZoom();
-        }
+        // if (chartInstance) {
+        //   chartInstance.resetZoom();
+        // }
       });
 
       const selectContainer = document.createElement('div');
